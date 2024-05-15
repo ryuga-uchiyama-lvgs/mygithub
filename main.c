@@ -1,4 +1,4 @@
-/*HTTPサーバー作成2024/05/15*/
+/*HTTPサーバー作成2024/05/15　17:51*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
