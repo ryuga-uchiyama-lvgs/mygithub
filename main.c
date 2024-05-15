@@ -101,6 +101,7 @@ int main() {
 
         // クライアントとの接続を閉じる
         close(new_socket);
+        
     }
 
     return 0;
