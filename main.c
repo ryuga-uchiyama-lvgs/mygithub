@@ -87,7 +87,7 @@ int main() {
 
             // ファイルが存在する場合にレスポンスメッセージを作成
             char header[1024];
-            sprintf(header, "HTTP/1.1 200 OK\nContent-Length: %ld\r\n", strlen(response_data));
+            sprintf(header, "HTTP/1.1 200 OK\nContent-Length: %ld\n\n", strlen(response_data));
             write(new_socket, header, strlen(header));  // ヘッダーを送信
             write(new_socket, response_data, strlen(response_data));  // ボディを送信
             free(response_data);  // 動的に確保したメモリを解放
@@ -95,7 +95,7 @@ int main() {
         } 
         else {
             // ファイルが存在しない場合のエラーレスポンスメッセージを作成
-            char *error_message = "HTTP/1.1 404 Not Found\nContent-Length: 13\r\n404 Not Found";/*\n\n→\r\n　2024/05/15*/
+            char *error_message = "HTTP/1.1 404 Not Found\nContent-Length: 13\n\n404 Not Found";
             write(new_socket, error_message, strlen(error_message));  // エラーメッセージを送信
         }
 
