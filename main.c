@@ -1,3 +1,4 @@
+/*HTTPサーバー作成2024/05/15*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
