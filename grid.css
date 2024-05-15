@@ -1,0 +1,56 @@
+/* コンテナ */
+#container {
+    display: grid;
+
+    grid-template-rows: 97px 968px 90px 393px;
+    grid-template-columns: 306px 862px 240px;
+    grid-template-areas:
+        "areaA areaA areaA"
+        "areaB areaC areaD"
+        "areaE areaE areaE"
+        "areaF areaF areaF";
+}
+/* アイテム */
+#header {
+    grid-area: areaA;
+    background: #f88;
+}
+.header-container{
+    height: 64px;
+    width: 1440px;
+    background: aqua;
+}
+.header-left{
+    display: flex;
+}
+.logo{
+    margin-top: 26px;
+    margin-bottom: 25px;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+.header-menu{
+    display:flex;
+}
+#navi {
+    grid-area: areaB;
+    background: #8f8;
+}
+#main {
+    grid-area: areaC;
+    background: #88f;
+}
+#side {
+    grid-area: areaD;
+    background: black;
+}
+
+#footer-top {
+    grid-area: areaE;
+    background: magenta;
+}
+
+#footer-bottom {
+    grid-area: areaF;
+    background: purple;
+}

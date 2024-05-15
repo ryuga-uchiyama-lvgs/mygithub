@@ -1,0 +1,622 @@
+h1{
+    font-family: "Inter";
+    font-weight: 600;
+    font-size:40px;
+    text-decoration: none;
+}
+h2{
+    font-family: "Inter";
+    font-weight: 400;
+    font-size:33px;
+    text-decoration: none;
+    color: #000000;
+}
+h3{
+    text-decoration: none;
+}
+p{
+    font-family:"Inter";
+    font-size: 16px;
+}
+body{
+    font-family:"Inter - 400";
+}
+.main{
+    display: flex;
+}
+.top{
+    width: 1440px;
+    height:54px;
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #f9f9fb;
+    text-align: center;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 54px;
+}
+.header{
+    width:1440px;
+    height: 65px;
+    margin-left:auto;
+    margin-right:auto;
+    display: flex;
+    justify-content: space-between;
+    background-color:white;
+    position: sticky;
+    top:0;
+    z-index: 1000; /* 高いz-index値で常に前面に */
+}
+.header-container{
+    display: flex;
+    width: 1440px;
+    height: 65px;
+    font-size: 16px;
+    margin-inline: auto;
+
+}
+.header-left{
+   display: flex;
+   align-items: center;
+}
+.header-menu{
+    display: flex;
+}
+.logo{
+    width: 160px;
+    height:24px;
+    background-color: white;
+}
+
+.header-contents{
+    margin-left:  16px;
+    font-size: 16px;
+}
+.reference{
+    width: 101px;
+    height:44px;
+}
+.guides{
+    width: 69px;
+    height:44px;
+}
+.plus{
+    width: 48px;
+    height:44px;
+}
+.curriculum{
+    width: 121px;
+    height:44px;
+}
+.blog{
+    width: 49px;
+    height:44px;
+}
+.play{
+    width: 48px;
+    height:44px;
+}
+.ai-help{
+    width: 95px;
+    height:44px;
+}
+
+.theme{
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    width:73px;
+    height:28px;
+    margin-top: 22px;
+    margin-bottom: 18px;
+    margin-left: 246px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.theme img{
+        margin: auto;
+        display: block;
+}
+.search-box{
+    width:80px;
+    height:32px;
+    margin-top: 23px;
+    margin-bottom: 18px;
+    margin-left: 8px;
+    background-color: #fff;
+    border-radius: 15px; /* 角の丸み */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 影の設定 */
+    display: flex;
+    align-items: center;
+}
+
+.search-box input {
+    border: none; /* 枠線を消す */
+    outline: none; /* アクティブ時の枠線を消す */
+    font-size: 16px; /* フォントサイズ */
+    font-weight: 400;
+    width: 100%; /* 入力エリアをボックスいっぱいに広げる */
+    color: black;
+}
+
+.search-box input::placeholder {
+    color: white; /* プレースホルダーの色 */
+}
+.log-in{
+    width:39px;
+    height:32px;
+    margin-top: 22px;
+    margin-bottom: 18px;
+    margin-left: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 23px;
+    color:black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.sign-up{
+    width:133px;
+    height:32px;
+    margin-top: 22px;
+    margin-bottom: 18px;
+    margin-left: 16px;
+    font-size: 13px;
+    line-height: 23px;
+    font-weight: 600;
+    color: white;
+    background-color: black ;
+    border-radius: 5px; /* 角の丸み */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.bread-frakes-list{
+    width: 1440px;
+    height:28px;
+    font-size: 16px;
+    line-height: 19px;
+    font-weight: 400;
+    margin-inline: auto;
+    color:#4e4e4e;
+    background-color: #EEEEEF;
+    border: 0.1px solid #000000;
+    display: flex;
+    align-items: center;
+}
+.bread1{
+    width: 128px;
+    height: 19px;
+}
+.bread2{
+    width: 28px;
+    height: 19px;
+    margin-left: 10px;
+    margin-right:10px;
+    text-align: center;
+
+}
+.bread3{
+    width: 282x;
+    height: 19px;
+}
+.bread-language{
+    width: 68px;
+    height: 28px;
+    display: flex;
+    margin-left: 902px;
+    font-weight: 600;
+    line-height: 16px;
+}
+.bread-logo{
+    width: 16px;
+    height:16px;
+    margin-top: 6px;
+    margin-bottom:6px;
+}
+.bread-word{
+    width: 68px;
+    height: 28px;
+    font-size: 13px;
+    padding-top:5.5px;
+    padding-bottom:5.5px;
+}
+.ad-zone{
+    width: 1440px;
+    height: 64px;
+    background-color: #dee8f2;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top:35px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.main{
+    width: 1440px;
+    height: 2367px;
+}
+.left-sidemenu{
+    height: 968px;
+    width: 306px;
+    margin-left: 19px;
+    overflow: scroll;
+    scrollbar-color: gray white;
+    font-family: "Inter";
+    list-style:none;
+    top:355px;
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 306px;
+}
+.button-container {
+    height: 80px;
+    width: 290px;  /* コンテナの幅 */
+    font-size: 13px;
+}
+
+.filter-button {
+    background-color: white;
+    border: 2px solid #EEEEEF;
+    border-radius: 12px; /* 角の丸み */
+    color: black;
+    font-size: 13px;
+    line-height: 23px;
+    padding: 4px 13px;  /* 上下のパディングは8px、左右のパディングは16px */
+    width: 80px;  /* ボタンの幅 */
+    height: 32px;  /* ボタンの高さ */
+    box-sizing: border-box;
+}
+li.section a {
+    font-size: 16px;
+    line-height: 28px;
+    font-weight: 600;
+    margin-top: 32px;
+    margin-bottom: 12px;
+}
+.li.section{
+    margin-top: 32px;
+    margin-bottom: 12px;
+}
+.left-sidemenu summary{
+    font-weight: 400;
+    font-size:13px;
+}
+.left-sidemenu ol{
+    padding-left: 0;
+}
+.left-sidemenu li{
+    padding-left: 10px;
+    list-style:none;
+    font-weight: 400;
+    font-size:13px;
+    margin-bottom: 20px;
+}
+.left-sidemenu a{
+    text-decoration: none;
+    font-size:13px;
+    color: black;
+}
+.section strong{
+    font-size: 16px;
+}
+.main-contents{
+    width:766px;
+    height:2367px;
+    margin-left:48px;
+    margin-right: 48px;
+}
+.right-sidemenu{
+    width:195px;
+    height:968px;
+    position: sticky;
+    top: 0;
+    right: 0;
+    width: 195px;
+}
+.right-sidemenu h2{
+    font-size: 19px;
+    line-height: 23px;
+    font-weight: 400;
+}
+.right-sidemenu li{
+    color: black;
+    margin-bottom: 10px;
+    margin-left: 16px;
+    font-size: 13px;
+    line-height: 23px;
+    font-weight: 400;
+
+
+}
+.right-sidemenu ul{
+    list-style:none;
+     padding: 0;
+     border-left:1px solid #EEEEEF;
+}
+.right-sidemenu a {
+    text-decoration: none; /* アンダーラインを消す */
+    color: black; /* リンクの色 */
+}
+.document-toc-heading{
+    font-size: 19px;
+    font-weight: 400;
+}
+.section-content ul{
+    margin-top:32px;
+    margin-bottom:32px;
+}
+.page-footer-grid{
+    display: flex;
+    margin-left: auto;
+    margin-right: auto;
+}
+@media screen and (min-width: 426px) {
+    .page-footer-grid {
+        background-color:#F9F9FB;
+        display:grid;
+        gap: 2.5rem;
+        grid-template-areas: "logo  . " "nav1  nav2" "nav3  nav4" "moz   moz" "legal legal";
+        grid-template-columns: 1fr 1fr
+    }
+
+    .page-footer-logo-col {
+        grid-area: logo
+    }
+
+    .page-footer-nav-col-1 {
+        grid-area: nav1
+    }
+
+    .page-footer-nav-col-2 {
+        grid-area: nav2
+    }
+
+    .page-footer-nav-col-3 {
+        grid-area: nav3
+    }
+
+    .page-footer-nav-col-4 {
+        grid-area: nav4
+    }
+
+    .page-footer-app-col {
+        grid-area: app
+    }
+
+    .page-footer-moz {
+        grid-area: moz
+    }
+
+    .page-footer-legal {
+        grid-area: legal
+    }
+
+    .page-footer-app-list {
+        flex-direction: row
+    }
+
+    .page-footer-app-dl img,.page-footer-app-dl svg {
+        height: 38px
+    }
+}
+
+@media screen and (min-width: 769px) {
+    .page-footer-grid {
+        gap:1rem;
+        grid-template-areas: "logo  nav1  nav2  nav3  nav4" "moz   moz   moz   moz   moz" "legal legal legal legal  . ";
+        grid-template-columns: minmax(260px,2fr) repeat(4,minmax(0,1fr))
+    }
+
+    .page-footer-app-list {
+        flex-direction: column
+    }
+
+    .page-footer-app-dl img,.page-footer-app-dl svg {
+        height: auto
+    }
+}
+
+@media screen and (min-width: 1441px) {
+    .page-footer-grid {
+        gap:2.5rem
+    }
+}
+
+.query-string {
+    font-style: italic
+}
+
+.site-search {
+    display: block
+}
+
+@media screen and (max-width: 769px) {
+    .site-search article {
+        display:flex;
+        flex-direction: column
+    }
+}
+
+.site-search article .place {
+    float: right;
+    padding: 1rem
+}
+
+@media screen and (max-width: 769px) {
+    .site-search article .place {
+        align-self:center;
+        float: none;
+        order: 4
+    }
+}
+.main-contents h1{
+    text-decoration: none;
+    color: #000000;
+    font-weight: 500;
+    line-height: 40px;
+    font-size: 33px;
+}
+#学習経路 > a {
+    text-decoration: none;
+    color: #000000;
+    font-weight: 500;
+    line-height: 40px;
+    font-size: 33px;
+}
+#モジュール > a {
+    text-decoration: none;
+    color: #000000;
+    font-weight: 500;
+    line-height: 40px;
+    font-size: 33px;
+}
+#よくある_html_の問題の解決 > a {
+    text-decoration: none;
+    color: #000000;
+    font-weight: 500;
+    line-height: 40px;
+    font-size: 33px;
+}
+#関連情報 > a {
+    text-decoration: none;
+    color: #000000;
+    font-weight: 500;
+    line-height: 40px;
+    font-size: 33px;
+}
+.help-about{
+    width: 766px;
+    height: 274px;
+    background-color: #f9f9fb;
+    padding: 17px 17px;
+    border-radius: 15px; /* 角の丸み */
+}
+.help-about-top{
+    width: 733px;
+    height: 148px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-title{
+    font-size: 33px;
+    font-weight: 500;
+}
+.help-about-l-p{
+    font-size: 16px;
+    font-weight: 400;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+.review-button{
+ width: 76px;
+ height: 33px;   
+ border: 2px solid #000000;
+ margin-right: 15px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+}
+
+.help-about-l{
+    width: 580px;
+    height: 147px;
+}
+.help-about-l-b{
+    display: flex;
+}
+.help-about-bottom{
+    width: 733px;
+    height: 56px;
+}
+.help-about-bottom{
+    margin-top: 37px;
+}
+.footer{
+    width: 1440px;
+    height: 329px;
+    background-color: #f9f9fb;
+    margin-left:auto;
+    margin-right:auto;
+    font-size:16px;
+    font-weight: 400;
+    line-height: 28px;
+}
+.top-footer{
+    background-color: #f9f9fb;
+    display: flex;
+    border-bottom: 2px solid #cdcdcd;
+    padding-top: 35px;
+}
+.mdn-explain{
+    width: 453px;
+    height:153px;
+}
+.mdn-expain-bottom img{
+    margin-right: 16px;
+}
+.f-c{
+    margin-left: 40px;
+    margin-right: 40px;
+    
+}
+.f-c-t{
+    font-size:16px;
+    font-weight: 400;
+    line-height: 28px;
+}
+.f-c ul{
+    list-style: none;
+    padding-left: 0;
+}
+.li-c{
+    margin-top: 15px;
+    margin-bottom: 15px;
+    font-size:13px;
+    font-weight: 400;
+    line-height: 23px;
+}
+.footer-bottom{
+    background-color: #f9f9fb;
+    font-size: 11px;
+    line-height: 19px;
+    font-weight: 400;
+    margin-top: 25px;
+}
+.footer-bottom-1{
+    display: flex;
+    text-align: center;
+    align-items: center;
+    font-size: 11px;
+    line-height: 19px;
+    font-weight: 400;
+}
+.f-b-contents{
+    font-size: 11px;
+    line-height: 19px;
+    font-weight: 400;
+    margin-left: 13px;
+}
+.f-b-contents p{
+    font-size: 11px;
+    line-height: 19px;
+    font-weight: 400;
+}
+.logo-mdn-bottom{
+   width: 112px;
+   height:32px; 
+}
+.f-b-1{
+    margin-left: 15px;
+}
+.f-b-1 a{
+    color: #000000;
+}
