@@ -3,10 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>/*ソケット生成*/
+#include <sys/socket.h> /*ソケット生成*/
 #include <netinet/in.h>
-#include <errno.h>/*内山エラー確認用*/
-
+#include <errno.h> /*内山エラー確認用*/
 
 /* ファイルの内容を読み取る関数 */
 char *read_file(const char *filename) {
@@ -82,21 +81,25 @@ int main() {
         }
 
         char *filename = uri + 1;  // 先頭の'/'を除去してファイル名を取得
-        char *response_data = read_file(filename);  // ファイルの内容を読み取る
 
-        if (response_data) {
+        char *response_data = read_file(filename);  // ファイルを読み取る
 
+        if (response_data){
             // ファイルが存在する場合にレスポンスメッセージを作成
             char header[1024];
             sprintf(header, "HTTP/1.1 200 OK\nContent-Length: %ld\n\n", strlen(response_data));
             write(new_socket, header, strlen(header));  // ヘッダーを送信
             write(new_socket, response_data, strlen(response_data));  // ボディを送信
             free(response_data);  // 動的に確保したメモリを解放
-
         } 
         else {
             // ファイルが存在しない場合のエラーレスポンスメッセージを作成
-            char *error_message = "HTTP/1.1 404 Not Found\nContent-Length: 13\n\n404 Not Found";
+            char *error_message;
+            if (errno == EACCES) {
+                error_message = "HTTP/1.1 403 Forbidden\nContent-Length: 13\n\n403 Forbidden";
+            } else {
+                error_message = "HTTP/1.1 404 Not Found\nContent-Length: 13\n\n404 Not Found";
+            }
             write(new_socket, error_message, strlen(error_message));  // エラーメッセージを送信
         }
 
