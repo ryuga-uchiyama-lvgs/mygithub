@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <errno.h>/*内山エラー確認用*/
 
+
 /* ファイルの内容を読み取る関数 */
 char *read_file(const char *filename) {
     // ファイルをバイナリモードで開く
