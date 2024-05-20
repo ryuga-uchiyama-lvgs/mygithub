@@ -1,0 +1,8 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/ryuga.uchiyama/mygithub/main'
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _read_file, symObjAddr: 0x0, symBinAddr: 0x1000039D8, symSize: 0xEC }
+  - { offsetInCU: 0x83, offset: 0x83, size: 0x8, addend: 0x0, symName: _read_file, symObjAddr: 0x0, symBinAddr: 0x1000039D8, symSize: 0xEC }
+  - { offsetInCU: 0xD5, offset: 0xD5, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xEC, symBinAddr: 0x100003AC4, symSize: 0x2AC }
+...
