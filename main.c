@@ -35,7 +35,7 @@ int main() {
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    char buffer[8000] = {0};
+    char buffer[１２000] = {0};
 
     // ソケットを作成
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
