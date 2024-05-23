@@ -1,140 +1,224 @@
-/*HTTPサーバー作成2024/05/20 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h> /*ソケット生成用*/
-#include <netinet/in.h>
-#include <errno.h> /*エラー確認用*/
+#include <sys/socket.h>/*ソケット通信に必要なライブラリ*/
+#include <netinet/in.h>/*アドレスファミリ用*/
+#include <errno.h>/*エラー確認用*/
+#include <sys/stat.h>/*ファイルのメタデータを取得する用*/
+
+#define INITIAL_BUFFER_SIZE 8000
 
 /* ファイルの内容を読み取る関数 */
 char *read_file(const char *filename) {
-    // ファイルをバイナリモードで開く
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL) {
-        perror("File opening failed");  // ファイルが開けなかった場合のエラー処理
+    struct stat file_stat;
+    if (stat(filename, &file_stat) < 0) {
+        perror("File stat failed");
         return NULL;
     }
 
-    // ファイルのサイズを取得
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    long length = file_stat.st_size;
 
-    // ファイルの内容を格納するためのバッファを確保
+    FILE *file;
+    errno_t err = fopen_s(&file, filename, "rb");
+    if (err != 0) {
+        perror("File opening failed");
+        return NULL;
+    }
+
     char *data = malloc(length + 1);
     if (data) {
-        fread(data, 1, length, file);  // ファイルの内容を読み取る
-        data[length] = '\0';  // 文字列として扱うためにヌル終端を追加
+        fread(data, 1, length, file);
+        data[length] = '\0';
     }
-    fclose(file);  // ファイルを閉じる
-    return data;  // 読み取ったデータを返す
+    fclose(file);
+    return data;
+}
+
+
+/* リクエストラインを完全に読み取る関数（動的バッファ拡張付き） */
+ssize_t read_request(int socket, char **buffer) {
+    size_t total_read = 0;
+    ssize_t bytes_read;
+    size_t buffer_size = INITIAL_BUFFER_SIZE;
+    char c;
+    int end_of_request = 0;
+
+    /*初期のバッファを確保*/
+    *buffer = malloc(buffer_size);
+    if (*buffer == NULL) {
+        perror("Malloc failed");
+        return -1;
+    }
+
+    while (!end_of_request) {
+        bytes_read = read(socket, &c, 1);
+        if (bytes_read == -1) {
+            perror("Read failed");
+            free(*buffer);
+            return -1;
+        }
+
+        if (bytes_read == 0) {
+            break;
+        }
+        if (total_read >= buffer_size - 1) {
+            buffer_size *= 2;
+            char *new_buffer = realloc(*buffer, buffer_size);
+            if (new_buffer == NULL) {
+                perror("Realloc failed");
+                free(*buffer);
+                return -1;
+            }
+            *buffer = new_buffer;
+        }
+        (*buffer)[total_read++] = c;
+
+        // リクエストの終端を検出
+        if (total_read >= 4 &&
+            (*buffer)[total_read - 1] == '\n' &&
+            (*buffer)[total_read - 2] == '\r' &&
+            (*buffer)[total_read - 3] == '\n' &&
+            (*buffer)[total_read - 4] == '\r') {
+            end_of_request = 1;
+        }
+    }
+    (*buffer)[total_read] = '\0';
+    return total_read;
+}
+
+/* エラーレスポンスを送信する関数 */
+void send_error_response(int socket, const char *status, const char *message) {
+    char response[256];
+    snprintf(response, sizeof(response), "HTTP/1.1 %s\r\nContent-Length: %ld\r\n\r\n%s", status, strlen(message), message);
+    write(socket, response, strlen(response));
+}
+
+/* パスをサニタイズする関数 */
+char *sanitize_path(const char *uri) {
+    if (strcmp(uri, "/") == 0) {
+        uri = "/index.html";
+    }
+
+    // 先頭の'/'を除去
+    char *path = strdup(uri + 1);
+
+    // パスに不正な文字列が含まれていないかチェック
+    if (strstr(path, "..")) {
+        free(path);
+        return NULL;
+    }
+
+    return path;
+}
+
+/* HTTPリクエストのメソッド、URI、プロトコルをパースする関数 */
+int parse_request(const char *buffer, char **method, char **uri, char **protocol) {
+    char *buf_copy = strdup(buffer);
+    if (buf_copy == NULL) {
+        perror("strdup failed");
+        return -1;
+    }
+
+    *method = strtok(buf_copy, " ");
+    *uri = strtok(NULL, " ");
+    *protocol = strtok(NULL, "\r\n");
+
+    if (*method == NULL || *uri == NULL || *protocol == NULL) {
+        free(buf_copy);
+        return -1;
+    }
+
+    return 0;
 }
 
 int main() {
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    char buffer[１２000] = {0};
+    char *buffer = NULL;
 
-    // ソケットを作成
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("Socket creation failed");  // ソケット作成に失敗した場合のエラー処理
+        perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
-    // ソケットアドレス構造体を設定
-    address.sin_family = AF_INET;  // アドレスファミリー（IPv4）
-    address.sin_addr.s_addr = INADDR_ANY;  // すべてのインターフェースで受け付ける
-    address.sin_port = htons(8080);  // ポート番号を設定
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(8080);
 
-    // ソケットにアドレスをバインド
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("Bind failed");  // バインドに失敗した場合のエラー処理
+        perror("Bind failed");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    // ソケットを接続待ち状態に設定
     if (listen(server_fd, 10) < 0) {
-        perror("Listen failed");  // リッスンに失敗した場合のエラー処理
+        perror("Listen failed");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    // メインのサーバーループ
+    printf("Server is listening on port 8080\n");
+
     while (1) {
         printf("Waiting for connections...\n");
 
-        // 接続要求を受け付ける
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
-            perror("Accept failed");  // 受付に失敗した場合のエラー処理
-            continue;  // 失敗した場合は次のループへ続行
+            perror("Accept failed");
+            continue;
         }
 
-        // クライアントからのリクエストメッセージを受信
-        int valread = read(new_socket, buffer, sizeof(buffer) - 1);
+        ssize_t valread = read_request(new_socket, &buffer);
         if (valread < 0) {
-            perror("Read failed");  // 読み取りに失敗した場合のエラー処理
             close(new_socket);
             continue;
         }
 
-        buffer[valread] = '\0';  // 受信したデータをヌル終端で文字列化
-
-        // HTTPメソッド、URI、プロトコルをパース
-        char *method = strtok(buffer, " ");
-        char *uri = strtok(NULL, " ");
-        char *protocol = strtok(NULL, "\r\n");
-
-        // リクエストの形式が無効な場合は400エラーを返す
-        if (method == NULL || uri == NULL || protocol == NULL) {
-            char *error_message = "HTTP/1.1 400 Bad Request\r\nContent-Length: 15\r\n\r\n400 Bad Request";
-            write(new_socket, error_message, strlen(error_message));
+        char *method, *uri, *protocol;
+        if (parse_request(buffer, &method, &uri, &protocol) < 0) {
+            send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
             close(new_socket);
+            free(buffer);
             continue;
         }
 
-        // サポートされていないHTTPメソッドの場合は405エラーを返す
         if (strcmp(method, "GET") != 0) {
-            char *error_message = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 23\r\n\r\n405 Method Not Allowed";
-            write(new_socket, error_message, strlen(error_message));
+            send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
             close(new_socket);
+            free(buffer);
             continue;
         }
 
-        // ルートが要求された場合はindex.htmlに置き換え
-        if (strcmp(uri, "/") == 0) {
-            uri = "/index.html";
+        char *filename = sanitize_path(uri);
+        if (filename == NULL) {
+            send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
+            close(new_socket);
+            free(buffer);
+            continue;
         }
 
-        // 先頭の'/'を除去してファイル名を取得
-        char *filename = uri + 1;
-        char *response_data = read_file(filename);  // ファイルを読み取る
+        char *response_data = read_file(filename);
+        free(filename);
 
-        // ファイルが存在する場合にレスポンスメッセージを作成
         if (response_data) {
             char header[8000];
-            sprintf(header, "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\n\r\n", strlen(response_data));
-            write(new_socket, header, strlen(header));  // ヘッダーを送信
-            write(new_socket, response_data, strlen(response_data));  // ボディを送信
-            free(response_data);  // 動的に確保したメモリを解放
+            snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\n\r\n", strlen(response_data));
+            write(new_socket, header, strlen(header));
+            write(new_socket, response_data, strlen(response_data));
+            free(response_data);
         } else {
-            // ファイルが存在しない場合のエラーレスポンスメッセージを作成
-            char *error_message;
             if (errno == EACCES) {
-                error_message = "HTTP/1.1 403 Forbidden\r\nContent-Length: 13\r\n\r\n403 Forbidden";
+                send_error_response(new_socket, "403 Forbidden", "403 Forbidden");
             } else {
-                error_message = "HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found";
+                send_error_response(new_socket, "404 Not Found", "404 Not Found");
             }
-            write(new_socket, error_message, strlen(error_message));  // エラーメッセージを送信
         }
 
-        // クライアントとの接続を閉じる
         close(new_socket);
+        free(buffer);
     }
 
-    // サーバーソケットを閉じる
     close(server_fd);
     return 0;
 }
