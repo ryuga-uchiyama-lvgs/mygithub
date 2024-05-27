@@ -2,39 +2,48 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>/*ソケット通信に必要なライブラリ*/
-#include <netinet/in.h>/*アドレスファミリ用*/
-#include <errno.h>/*エラー確認用*/
-#include <sys/stat.h>/*ファイルのメタデータを取得する用*/
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 #define INITIAL_BUFFER_SIZE 8000
 
 /* ファイルの内容を読み取る関数 */
-char *read_file(const char *filename) {
+char *read_file(const char *filename, size_t *length) {
     struct stat file_stat;
     if (stat(filename, &file_stat) < 0) {
         perror("File stat failed");
         return NULL;
     }
 
-    long length = file_stat.st_size;
+    *length = file_stat.st_size;
 
-    FILE *file;
-    errno_t err = fopen_s(&file, filename, "rb");
-    if (err != 0) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
         perror("File opening failed");
         return NULL;
     }
 
-    char *data = malloc(length + 1);
+    char *data = malloc(*length);
     if (data) {
-        fread(data, 1, length, file);
-        data[length] = '\0';
+        fread(data, 1, *length, file);
     }
     fclose(file);
     return data;
 }
 
+const char *get_content_type(const char *filename) {
+    const char *ext = strrchr(filename, '.');
+    if (ext) {
+        if (strcmp(ext, ".html") == 0) return "text/html";
+        if (strcmp(ext, ".jpg") == 0) return "image/jpeg";
+        if (strcmp(ext, ".jpeg") == 0) return "image/jpeg";
+        if (strcmp(ext, ".png") == 0) return "image/png";
+        if (strcmp(ext, ".gif") == 0) return "image/gif";
+    }
+    return "application/octet-stream";
+}
 
 /* リクエストラインを完全に読み取る関数（動的バッファ拡張付き） */
 ssize_t read_request(int socket, char **buffer) {
@@ -44,7 +53,6 @@ ssize_t read_request(int socket, char **buffer) {
     char c;
     int end_of_request = 0;
 
-    /*初期のバッファを確保*/
     *buffer = malloc(buffer_size);
     if (*buffer == NULL) {
         perror("Malloc failed");
@@ -58,7 +66,6 @@ ssize_t read_request(int socket, char **buffer) {
             free(*buffer);
             return -1;
         }
-
         if (bytes_read == 0) {
             break;
         }
@@ -198,14 +205,16 @@ int main() {
             continue;
         }
 
-        char *response_data = read_file(filename);
+        size_t length;
+        char *response_data = read_file(filename, &length);
         free(filename);
 
         if (response_data) {
+            const char *content_type = get_content_type(filename);
             char header[8000];
-            snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\n\r\n", strlen(response_data));
+            snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: %s\r\n\r\n", length, content_type);
             write(new_socket, header, strlen(header));
-            write(new_socket, response_data, strlen(response_data));
+            write(new_socket, response_data, length);
             free(response_data);
         } else {
             if (errno == EACCES) {
