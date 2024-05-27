@@ -207,7 +207,6 @@ int main() {
 
         size_t length;
         char *response_data = read_file(filename, &length);
-        free(filename);
 
         if (response_data) {
             const char *content_type = get_content_type(filename);
