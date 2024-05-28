@@ -9,9 +9,10 @@
 
 #define INITIAL_BUFFER_SIZE 8000
 
-/* ファイルの内容を読み取る関数 */
 char *read_file(const char *filename, size_t *length) {
     struct stat file_stat;
+    printf("Trying to read file: %s\n", filename); // デバッグメッセージ
+
     if (stat(filename, &file_stat) < 0) {
         perror("File stat failed");
         return NULL;
@@ -41,11 +42,11 @@ const char *get_content_type(const char *filename) {
         if (strcmp(ext, ".jpeg") == 0) return "image/jpeg";
         if (strcmp(ext, ".png") == 0) return "image/png";
         if (strcmp(ext, ".gif") == 0) return "image/gif";
+        if (strcmp(ext, ".css") == 0) return "text/css"; // CSSのContent-Typeを追加
     }
     return "application/octet-stream";
 }
 
-/* リクエストラインを完全に読み取る関数（動的バッファ拡張付き） */
 ssize_t read_request(int socket, char **buffer) {
     size_t total_read = 0;
     ssize_t bytes_read;
@@ -81,7 +82,6 @@ ssize_t read_request(int socket, char **buffer) {
         }
         (*buffer)[total_read++] = c;
 
-        // リクエストの終端を検出
         if (total_read >= 4 &&
             (*buffer)[total_read - 1] == '\n' &&
             (*buffer)[total_read - 2] == '\r' &&
@@ -94,32 +94,28 @@ ssize_t read_request(int socket, char **buffer) {
     return total_read;
 }
 
-/* エラーレスポンスを送信する関数 */
 void send_error_response(int socket, const char *status, const char *message) {
     char response[256];
     snprintf(response, sizeof(response), "HTTP/1.1 %s\r\nContent-Length: %ld\r\n\r\n%s", status, strlen(message), message);
     write(socket, response, strlen(response));
 }
 
-/* パスをサニタイズする関数 */
 char *sanitize_path(const char *uri) {
     if (strcmp(uri, "/") == 0) {
         uri = "/index.html";
     }
 
-    // 先頭の'/'を除去
     char *path = strdup(uri + 1);
 
-    // パスに不正な文字列が含まれていないかチェック
     if (strstr(path, "..")) {
         free(path);
         return NULL;
     }
 
+    printf("Sanitized path: %s\n", path); // デバッグメッセージ
     return path;
 }
 
-/* HTTPリクエストのメソッド、URI、プロトコルをパースする関数 */
 int parse_request(const char *buffer, char **method, char **uri, char **protocol) {
     char *buf_copy = strdup(buffer);
     if (buf_copy == NULL) {
@@ -207,7 +203,6 @@ int main() {
 
         size_t length;
         char *response_data = read_file(filename, &length);
-
         if (response_data) {
             const char *content_type = get_content_type(filename);
             char header[8000];
@@ -216,11 +211,8 @@ int main() {
             write(new_socket, response_data, length);
             free(response_data);
         } else {
-            if (errno == EACCES) {
-                send_error_response(new_socket, "403 Forbidden", "403 Forbidden");
-            } else {
-                send_error_response(new_socket, "404 Not Found", "404 Not Found");
-            }
+            perror("File read failed"); // デバッグメッセージ
+            send_error_response(new_socket, "404 Not Found", "404 Not Found");
         }
 
         close(new_socket);
