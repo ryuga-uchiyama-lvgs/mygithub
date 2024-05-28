@@ -6,6 +6,8 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define INITIAL_BUFFER_SIZE 8000
 
@@ -130,11 +132,60 @@ int parse_request(const char *buffer, char **method, char **uri, char **protocol
     return 0;
 }
 
+void handle_client(int new_socket) {
+    char *buffer = NULL;
+
+    ssize_t valread = read_request(new_socket, &buffer);
+    if (valread < 0) {
+        close(new_socket);
+        return;
+    }
+
+    char *method, *uri, *protocol;
+    if (parse_request(buffer, &method, &uri, &protocol) < 0) {
+        send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
+        close(new_socket);
+        free(buffer);
+        return;
+    }
+
+    if (strcmp(method, "GET") != 0) {
+        send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
+        close(new_socket);
+        free(buffer);
+        return;
+    }
+
+    char *filename = sanitize_path(uri);
+    if (filename == NULL) {
+        send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
+        close(new_socket);
+        free(buffer);
+        return;
+    }
+
+    size_t length;
+    char *response_data = read_file(filename, &length);
+    if (response_data) {
+        const char *content_type = get_content_type(filename);
+        char header[8000];
+        snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: %s\r\n\r\n", length, content_type);
+        write(new_socket, header, strlen(header));
+        write(new_socket, response_data, length);
+        free(response_data);
+    } else {
+        perror("File read failed");
+        send_error_response(new_socket, "404 Not Found", "404 Not Found");
+    }
+
+    close(new_socket);
+    free(buffer);
+}
+
 int main() {
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    char *buffer = NULL;
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("Socket creation failed");
@@ -167,51 +218,21 @@ int main() {
             continue;
         }
 
-        ssize_t valread = read_request(new_socket, &buffer);
-        if (valread < 0) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            perror("Fork failed");
             close(new_socket);
             continue;
         }
 
-        char *method, *uri, *protocol;
-        if (parse_request(buffer, &method, &uri, &protocol) < 0) {
-            send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
-            close(new_socket);
-            free(buffer);
-            continue;
-        }
-
-        if (strcmp(method, "GET") != 0) {
-            send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
-            close(new_socket);
-            free(buffer);
-            continue;
-        }
-
-        char *filename = sanitize_path(uri);
-        if (filename == NULL) {
-            send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
-            close(new_socket);
-            free(buffer);
-            continue;
-        }
-
-        size_t length;
-        char *response_data = read_file(filename, &length);
-        if (response_data) {
-            const char *content_type = get_content_type(filename);
-            char header[8000];
-            snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: %s\r\n\r\n", length, content_type);
-            write(new_socket, header, strlen(header));
-            write(new_socket, response_data, length);
-            free(response_data);
+        if (pid == 0) {
+            close(server_fd);
+            handle_client(new_socket);
+            exit(0);
         } else {
-            perror("File read failed");
-            send_error_response(new_socket, "404 Not Found", "404 Not Found");
+            close(new_socket);
+            waitpid(-1, NULL, WNOHANG); // 子プロセスのゾンビ化を防ぐ
         }
-
-        close(new_socket);
-        free(buffer);
     }
 
     close(server_fd);
