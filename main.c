@@ -48,7 +48,7 @@ const char *get_content_type(const char *filename) {
     return "application/octet-stream";
 }
 
-ssize_t read_request(int socket, char **buffer) {
+ssize_t read_request(int socket, char **buffer, size_t *content_length) {
     size_t total_read = 0;
     ssize_t bytes_read;
     size_t buffer_size = INITIAL_BUFFER_SIZE;
@@ -91,6 +91,14 @@ ssize_t read_request(int socket, char **buffer) {
         }
     }
     (*buffer)[total_read] = '\0';
+
+    // Extract content length for POST request
+    *content_length = 0;
+    char *content_length_str = strstr(*buffer, "Content-Length:");
+    if (content_length_str) {
+        *content_length = strtoul(content_length_str + 15, NULL, 10);
+    }
+
     return total_read;
 }
 
@@ -113,7 +121,7 @@ char *sanitize_path(const char *uri) {
     return path;
 }
 
-int parse_request(const char *buffer, char **method, char **uri, char **protocol) {
+int parse_request(const char *buffer, char **method, char **uri, char **protocol, char **body, size_t content_length) {
     char *buf_copy = strdup(buffer);
     if (buf_copy == NULL) {
         perror("strdup failed");
@@ -129,27 +137,37 @@ int parse_request(const char *buffer, char **method, char **uri, char **protocol
         return -1;
     }
 
+    if (content_length > 0) {
+        *body = strstr(buffer, "\r\n\r\n");
+        if (*body) {
+            *body += 4;  // Skip the "\r\n\r\n"
+        }
+    } else {
+        *body = NULL;
+    }
+
     return 0;
 }
 
 void handle_client(int new_socket) {
     char *buffer = NULL;
+    size_t content_length = 0;
 
-    ssize_t valread = read_request(new_socket, &buffer);
+    ssize_t valread = read_request(new_socket, &buffer, &content_length);
     if (valread < 0) {
         close(new_socket);
         return;
     }
 
-    char *method, *uri, *protocol;
-    if (parse_request(buffer, &method, &uri, &protocol) < 0) {
+    char *method, *uri, *protocol, *body;
+    if (parse_request(buffer, &method, &uri, &protocol, &body, content_length) < 0) {
         send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
         close(new_socket);
         free(buffer);
         return;
     }
 
-    if (strcmp(method, "GET") != 0) {
+    if (strcmp(method, "GET") != 0 && strcmp(method, "POST") != 0) {
         send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
         close(new_socket);
         free(buffer);
@@ -164,18 +182,27 @@ void handle_client(int new_socket) {
         return;
     }
 
-    size_t length;
-    char *response_data = read_file(filename, &length);
-    if (response_data) {
-        const char *content_type = get_content_type(filename);
-        char header[8000];
-        snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: %s\r\n\r\n", length, content_type);
-        write(new_socket, header, strlen(header));
-        write(new_socket, response_data, length);
-        free(response_data);
-    } else {
-        perror("File read failed");
-        send_error_response(new_socket, "404 Not Found", "404 Not Found");
+    if (strcmp(method, "GET") == 0) {
+        size_t length;
+        char *response_data = read_file(filename, &length);
+        if (response_data) {
+            const char *content_type = get_content_type(filename);
+            char header[8000];
+            snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: %s\r\n\r\n", length, content_type);
+            write(new_socket, header, strlen(header));
+            write(new_socket, response_data, length);
+            free(response_data);
+        } else {
+            perror("File read failed");
+            send_error_response(new_socket, "404 Not Found", "404 Not Found");
+        }
+    } else if (strcmp(method, "POST") == 0) {
+        // Process POST request
+        printf("Received POST request: %s\n", body);
+
+        char response[256];
+        snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: text/plain\r\n\r\n%s", strlen("POST request received"), "POST request received");
+        write(new_socket, response, strlen(response));
     }
 
     close(new_socket);
