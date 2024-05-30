@@ -92,7 +92,6 @@ ssize_t read_request(int socket, char **buffer, size_t *content_length) {
     }
     (*buffer)[total_read] = '\0';
 
-    // Extract content length for POST request
     *content_length = 0;
     char *content_length_str = strstr(*buffer, "Content-Length:");
     if (content_length_str) {
@@ -197,8 +196,53 @@ void handle_client(int new_socket) {
             send_error_response(new_socket, "404 Not Found", "404 Not Found");
         }
     } else if (strcmp(method, "POST") == 0) {
-        // Process POST request
-        printf("Received POST request: %s\n", body);
+        printf("Received POST request\n");
+
+        const char *content_type = strstr(buffer, "Content-Type:");
+        if (content_type && strstr(content_type, "multipart/form-data")) {
+            // 画像データを保存する
+            const char *boundary = strstr(content_type, "boundary=");
+            if (boundary) {
+                boundary += 9; // "boundary=" の長さ
+                char *boundary_end = strstr(boundary, "\r\n");
+                if (boundary_end) {
+                    size_t boundary_length = boundary_end - boundary;
+                    char *boundary_str = strndup(boundary, boundary_length);
+
+                    // ボディの開始位置を取得
+                    char *body_start = strstr(buffer, "\r\n\r\n");
+                    if (body_start) {
+                        body_start += 4;
+
+                        // 画像データの開始位置を取得
+                        char *file_data_start = strstr(body_start, boundary_str);
+                        if (file_data_start) {
+                            file_data_start += boundary_length + 2; // "--"をスキップ
+                            file_data_start = strstr(file_data_start, "\r\n\r\n");
+                            if (file_data_start) {
+                                file_data_start += 4;
+
+                                // 画像データの終了位置を取得
+                                char *file_data_end = strstr(file_data_start, boundary_str);
+                                if (file_data_end) {
+                                    file_data_end -= 4; // "\r\n--"をスキップ
+                                    size_t file_data_length = file_data_end - file_data_start;
+
+                                    // 画像データをファイルに保存
+                                    FILE *fp = fopen("uploaded_image.jpg", "wb");
+                                    if (fp) {
+                                        fwrite(file_data_start, 1, file_data_length, fp);
+                                        fclose(fp);
+                                        printf("Image saved as uploaded_image.jpg\n");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    free(boundary_str);
+                }
+            }
+        }
 
         char response[256];
         snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: text/plain\r\n\r\n%s", strlen("POST request received"), "POST request received");
