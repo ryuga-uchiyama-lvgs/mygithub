@@ -197,56 +197,68 @@ void handle_client(int new_socket) {
         }
     } else if (strcmp(method, "POST") == 0) {
         printf("Received POST request\n");
-
         const char *content_type = strstr(buffer, "Content-Type:");
         if (content_type && strstr(content_type, "multipart/form-data")) {
-            // 画像データを保存する
             const char *boundary = strstr(content_type, "boundary=");
             if (boundary) {
                 boundary += 9; // "boundary=" の長さ
                 char *boundary_end = strstr(boundary, "\r\n");
                 if (boundary_end) {
                     size_t boundary_length = boundary_end - boundary;
-                    char *boundary_str = strndup(boundary, boundary_length);
+                    char boundary_str[boundary_length + 1];
+                    strncpy(boundary_str, boundary, boundary_length);
+                    boundary_str[boundary_length] = '\0';
+                    printf("Boundary: %s\n", boundary_str);
 
-                    // ボディの開始位置を取得
                     char *body_start = strstr(buffer, "\r\n\r\n");
                     if (body_start) {
                         body_start += 4;
 
                         // 画像データの開始位置を取得
-                        char *file_data_start = strstr(body_start, boundary_str);
-                        if (file_data_start) {
-                            file_data_start += boundary_length + 2; // "--"をスキップ
-                            file_data_start = strstr(file_data_start, "\r\n\r\n");
-                            if (file_data_start) {
-                                file_data_start += 4;
+                        char *file_data_start = strstr(body_start, "\r\n\r\n") + 4;
+                        file_data_start = strstr(file_data_start, "\r\n\r\n") + 4; // 二重のCRLFをスキップ
+                        char *file_data_end = strstr(file_data_start, boundary_str) - 4;
+                        size_t file_data_length = file_data_end - file_data_start;
 
-                                // 画像データの終了位置を取得
-                                char *file_data_end = strstr(file_data_start, boundary_str);
-                                if (file_data_end) {
-                                    file_data_end -= 4; // "\r\n--"をスキップ
-                                    size_t file_data_length = file_data_end - file_data_start;
+                        printf("File data start: %.*s\n", 50, file_data_start); // データの開始部分を表示
+                        printf("Saving file data: start=%p, end=%p, length=%ld\n", file_data_start, file_data_end, file_data_length);
 
-                                    // 画像データをファイルに保存
-                                    FILE *fp = fopen("uploaded_image.jpg", "wb");
-                                    if (fp) {
-                                        fwrite(file_data_start, 1, file_data_length, fp);
-                                        fclose(fp);
-                                        printf("Image saved as uploaded_image.jpg\n");
-                                    }
-                                }
-                            }
+                        // 画像データをファイルに保存
+                        FILE *fp = fopen("uploaded_image.jpg", "wb");
+                        if (fp) {
+                            fwrite(file_data_start, 1, file_data_length, fp);
+                            fclose(fp);
+                            printf("Image saved as uploaded_image.jpg\n");
+
+                            // 画像を表示するHTMLレスポンスを送信
+                            const char *html_response_template =
+                                "HTTP/1.1 200 OK\r\n"
+                                "Content-Type: text/html\r\n"
+                                "\r\n"
+                                "<html><body><h1>Uploaded Image</h1>"
+                                "<img src=\"uploaded_image.jpg\" alt=\"Uploaded Image\"/></body></html>";
+
+                            write(new_socket, html_response_template, strlen(html_response_template));
+                        } else {
+                            perror("File save failed");
+                            send_error_response(new_socket, "500 Internal Server Error", "File save failed");
                         }
+                    } else {
+                        printf("Failed to find body start\n");
+                        send_error_response(new_socket, "400 Bad Request", "Failed to find body start");
                     }
-                    free(boundary_str);
+                } else {
+                    printf("Failed to find boundary end\n");
+                    send_error_response(new_socket, "400 Bad Request", "Failed to find boundary end");
                 }
+            } else {
+                printf("Failed to find boundary\n");
+                send_error_response(new_socket, "400 Bad Request", "Failed to find boundary");
             }
+        } else {
+            printf("Content-Type is not multipart/form-data\n");
+            send_error_response(new_socket, "400 Bad Request", "Content-Type is not multipart/form-data");
         }
-
-        char response[256];
-        snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\nContent-Type: text/plain\r\n\r\n%s", strlen("POST request received"), "POST request received");
-        write(new_socket, response, strlen(response));
     }
 
     close(new_socket);
@@ -302,7 +314,7 @@ int main() {
             exit(0);
         } else {
             close(new_socket);
-            waitpid(-1, NULL, WNOHANG); // 子プロセスのゾンビ化を防ぐ
+            waitpid(-1, NULL, WNOHANG);
         }
     }
 
