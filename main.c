@@ -8,8 +8,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #define INITIAL_BUFFER_SIZE 8000
+
+// シグナルハンドラー
+void handle_sigchld(int sig) {
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+}
 
 char *read_file(const char *filename, size_t *length) {
     struct stat file_stat;
@@ -214,7 +220,6 @@ void handle_client(int new_socket) {
                     if (body_start) {
                         body_start += 4;
 
-                        // 画像データの開始位置を取得
                         char *file_data_start = strstr(body_start, "\r\n\r\n") + 4;
                         if (!file_data_start) {
                             printf("Failed to find file data start\n");
@@ -237,12 +242,17 @@ void handle_client(int new_socket) {
                         printf("File data start: %.*s\n", 50, file_data_start); // データの開始部分を表示
                         printf("Saving file data: start=%p, end=%p, length=%ld\n", file_data_start, file_data_end, file_data_length);
 
+                        // ファイルパスの作成
+                        char filepath[256];
+                        snprintf(filepath, sizeof(filepath), "uploaded_image.jpg");
+                        printf("File path: %s\n", filepath);
+
                         // 画像データをファイルに保存
-                        FILE *fp = fopen("uploaded_image.jpg", "wb");
+                        FILE *fp = fopen(filepath, "wb");
                         if (fp) {
                             fwrite(file_data_start, 1, file_data_length, fp);
                             fclose(fp);
-                            printf("Image saved as uploaded_image.jpg\n");
+                            printf("Image saved as %s\n", filepath);
 
                             // 画像を表示するHTMLレスポンスを送信
                             const char *html_response_template =
@@ -281,6 +291,15 @@ void handle_client(int new_socket) {
 }
 
 int main() {
+    struct sigaction sa;
+    sa.sa_handler = &handle_sigchld;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGCHLD, &sa, 0) == -1) {
+        perror("sigaction");
+        exit(1);
+    }
+
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -312,8 +331,12 @@ int main() {
         printf("Waiting for connections...\n");
 
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
-            perror("Accept failed");
-            continue;
+            if (errno == EINTR) {
+                continue; // accept() がシグナルで中断された場合は再試行
+            } else {
+                perror("Accept failed");
+                continue;
+            }
         }
 
         pid_t pid = fork();
@@ -329,7 +352,6 @@ int main() {
             exit(0);
         } else {
             close(new_socket);
-            waitpid(-1, NULL, WNOHANG);
         }
     }
 
