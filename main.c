@@ -216,8 +216,22 @@ void handle_client(int new_socket) {
 
                         // 画像データの開始位置を取得
                         char *file_data_start = strstr(body_start, "\r\n\r\n") + 4;
-                        file_data_start = strstr(file_data_start, "\r\n\r\n") + 4; // 二重のCRLFをスキップ
+                        if (!file_data_start) {
+                            printf("Failed to find file data start\n");
+                            send_error_response(new_socket, "400 Bad Request", "Failed to find file data start");
+                            close(new_socket);
+                            free(buffer);
+                            return;
+                        }
+
                         char *file_data_end = strstr(file_data_start, boundary_str) - 4;
+                        if (!file_data_end) {
+                            printf("Failed to find file data end\n");
+                            send_error_response(new_socket, "400 Bad Request", "Failed to find file data end");
+                            close(new_socket);
+                            free(buffer);
+                            return;
+                        }
                         size_t file_data_length = file_data_end - file_data_start;
 
                         printf("File data start: %.*s\n", 50, file_data_start); // データの開始部分を表示
@@ -238,6 +252,7 @@ void handle_client(int new_socket) {
                                 "<html><body><h1>Uploaded Image</h1>"
                                 "<img src=\"uploaded_image.jpg\" alt=\"Uploaded Image\"/></body></html>";
 
+                            printf("Sending HTML response:\n%s\n", html_response_template);
                             write(new_socket, html_response_template, strlen(html_response_template));
                         } else {
                             perror("File save failed");
