@@ -4,17 +4,94 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <signal.h>
 
+#define PORT 8080
+#define BUFSIZE 8192
 #define INITIAL_BUFFER_SIZE 8000
 
-// シグナルハンドラー
-void handle_sigchld(int sig) {
-    while (waitpid(-1, NULL, WNOHANG) > 0);
+void error(const char *msg) {
+    perror(msg);
+    exit(1);
+}
+
+void handle_request(int newsockfd) {
+    char buffer[BUFSIZE];
+    int n;
+
+    n = read(newsockfd, buffer, BUFSIZE - 1);
+    if (n < 0) error("ERROR reading from socket");
+    buffer[n] = 0;
+
+    printf("Here is the message: %s\n", buffer);
+
+    if (strncmp(buffer, "GET ", 4) == 0) {
+        // Handle GET request
+        char *filepath = strtok(buffer + 4, " ");
+        if (strcmp(filepath, "/") == 0) {
+            filepath = "/index.html";
+        }
+
+        char fullpath[BUFSIZE] = ".";
+        strncat(fullpath, filepath, BUFSIZE - strlen(fullpath) - 1);
+
+        int filefd = open(fullpath, O_RDONLY);
+        if (filefd < 0) {
+            char *not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found";
+            write(newsockfd, not_found, strlen(not_found));
+        } else {
+            char response[BUFSIZE];
+            sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
+            write(newsockfd, response, strlen(response));
+
+            while ((n = read(filefd, buffer, BUFSIZE)) > 0) {
+                write(newsockfd, buffer, n);
+            }
+            close(filefd);
+        }
+    } else if (strncmp(buffer, "POST ", 5) == 0) {
+        // Handle POST request
+        char *content_length_str = strstr(buffer, "Content-Length: ");
+        int content_length = 0;
+        if (content_length_str) {
+            sscanf(content_length_str, "Content-Length: %d", &content_length);
+        }
+
+        char *content = strstr(buffer, "\r\n\r\n");
+        if (content) {
+            content += 4; // Skip past \r\n\r\n
+            int content_size = n - (content - buffer);
+
+            FILE *file = fopen("upload.jpg", "wb");
+            if (file) {
+                fwrite(content, 1, content_size, file);
+                while (content_size < content_length) {
+                    n = read(newsockfd, buffer, BUFSIZE);
+                    if (n <= 0) break;
+                    fwrite(buffer, 1, n, file);
+                    content_size += n;
+                }
+                fclose(file);
+
+                char *ok_response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
+                write(newsockfd, ok_response, strlen(ok_response));
+            } else {
+                char *internal_error = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\n\r\n500 Internal Server Error";
+                write(newsockfd, internal_error, strlen(internal_error));
+            }
+        } else {
+            char *bad_request = "HTTP/1.1 400 Bad Request\r\nContent-Length: 15\r\n\r\n400 Bad Request";
+            write(newsockfd, bad_request, strlen(bad_request));
+        }
+    } else {
+        char *bad_request = "HTTP/1.1 400 Bad Request\r\nContent-Length: 15\r\n\r\n400 Bad Request";
+        write(newsockfd, bad_request, strlen(bad_request));
+    }
 }
 
 char *read_file(const char *filename, size_t *length) {
@@ -54,7 +131,7 @@ const char *get_content_type(const char *filename) {
     return "application/octet-stream";
 }
 
-ssize_t read_request(int socket, char **buffer, size_t *content_length) {
+ssize_t read_request(int socket, char **buffer) {
     size_t total_read = 0;
     ssize_t bytes_read;
     size_t buffer_size = INITIAL_BUFFER_SIZE;
@@ -97,13 +174,6 @@ ssize_t read_request(int socket, char **buffer, size_t *content_length) {
         }
     }
     (*buffer)[total_read] = '\0';
-
-    *content_length = 0;
-    char *content_length_str = strstr(*buffer, "Content-Length:");
-    if (content_length_str) {
-        *content_length = strtoul(content_length_str + 15, NULL, 10);
-    }
-
     return total_read;
 }
 
@@ -126,7 +196,7 @@ char *sanitize_path(const char *uri) {
     return path;
 }
 
-int parse_request(const char *buffer, char **method, char **uri, char **protocol, char **body, size_t content_length) {
+int parse_request(const char *buffer, char **method, char **uri, char **protocol) {
     char *buf_copy = strdup(buffer);
     if (buf_copy == NULL) {
         perror("strdup failed");
@@ -142,45 +212,20 @@ int parse_request(const char *buffer, char **method, char **uri, char **protocol
         return -1;
     }
 
-    if (content_length > 0) {
-        *body = strstr(buffer, "\r\n\r\n");
-        if (*body) {
-            *body += 4;  // Skip the "\r\n\r\n"
-        }
-    } else {
-        *body = NULL;
-    }
-
     return 0;
 }
 
 void handle_client(int new_socket) {
     char *buffer = NULL;
-    size_t content_length = 0;
 
-    ssize_t valread = read_request(new_socket, &buffer, &content_length);
+    ssize_t valread = read_request(new_socket, &buffer);
     if (valread < 0) {
         close(new_socket);
         return;
     }
 
-    char *method, *uri, *protocol, *body;
-    if (parse_request(buffer, &method, &uri, &protocol, &body, content_length) < 0) {
-        send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
-        close(new_socket);
-        free(buffer);
-        return;
-    }
-
-    if (strcmp(method, "GET") != 0 && strcmp(method, "POST") != 0) {
-        send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
-        close(new_socket);
-        free(buffer);
-        return;
-    }
-
-    char *filename = sanitize_path(uri);
-    if (filename == NULL) {
+    char *method, *uri, *protocol;
+    if (parse_request(buffer, &method, &uri, &protocol) < 0) {
         send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
         close(new_socket);
         free(buffer);
@@ -188,6 +233,14 @@ void handle_client(int new_socket) {
     }
 
     if (strcmp(method, "GET") == 0) {
+        char *filename = sanitize_path(uri);
+        if (filename == NULL) {
+            send_error_response(new_socket, "400 Bad Request", "400 Bad Request");
+            close(new_socket);
+            free(buffer);
+            return;
+        }
+
         size_t length;
         char *response_data = read_file(filename, &length);
         if (response_data) {
@@ -202,88 +255,41 @@ void handle_client(int new_socket) {
             send_error_response(new_socket, "404 Not Found", "404 Not Found");
         }
     } else if (strcmp(method, "POST") == 0) {
-        printf("Received POST request\n");
-        const char *content_type = strstr(buffer, "Content-Type:");
-        if (content_type && strstr(content_type, "multipart/form-data")) {
-            const char *boundary = strstr(content_type, "boundary=");
-            if (boundary) {
-                boundary += 9; // "boundary=" の長さ
-                char *boundary_end = strstr(boundary, "\r\n");
-                if (boundary_end) {
-                    size_t boundary_length = boundary_end - boundary;
-                    char boundary_str[boundary_length + 1];
-                    strncpy(boundary_str, boundary, boundary_length);
-                    boundary_str[boundary_length] = '\0';
-                    printf("Boundary: %s\n", boundary_str);
+        // Handle POST request
+        char *content_length_str = strstr(buffer, "Content-Length: ");
+        int content_length = 0;
+        if (content_length_str) {
+            sscanf(content_length_str, "Content-Length: %d", &content_length);
+        }
 
-                    char *body_start = strstr(buffer, "\r\n\r\n");
-                    if (body_start) {
-                        body_start += 4;
+        char *content = strstr(buffer, "\r\n\r\n");
+        if (content) {
+            content += 4; // Skip past \r\n\r\n
+            int content_size = valread - (content - buffer);
 
-                        char *file_data_start = strstr(body_start, "\r\n\r\n") + 4;
-                        if (!file_data_start) {
-                            printf("Failed to find file data start\n");
-                            send_error_response(new_socket, "400 Bad Request", "Failed to find file data start");
-                            close(new_socket);
-                            free(buffer);
-                            return;
-                        }
-
-                        char *file_data_end = strstr(file_data_start, boundary_str) - 4;
-                        if (!file_data_end) {
-                            printf("Failed to find file data end\n");
-                            send_error_response(new_socket, "400 Bad Request", "Failed to find file data end");
-                            close(new_socket);
-                            free(buffer);
-                            return;
-                        }
-                        size_t file_data_length = file_data_end - file_data_start;
-
-                        printf("File data start: %.*s\n", 50, file_data_start); // データの開始部分を表示
-                        printf("Saving file data: start=%p, end=%p, length=%ld\n", file_data_start, file_data_end, file_data_length);
-
-                        // ファイルパスの作成
-                        char filepath[256];
-                        snprintf(filepath, sizeof(filepath), "uploaded_image.jpg");
-                        printf("File path: %s\n", filepath);
-
-                        // 画像データをファイルに保存
-                        FILE *fp = fopen(filepath, "wb");
-                        if (fp) {
-                            fwrite(file_data_start, 1, file_data_length, fp);
-                            fclose(fp);
-                            printf("Image saved as %s\n", filepath);
-
-                            // 画像を表示するHTMLレスポンスを送信
-                            const char *html_response_template =
-                                "HTTP/1.1 200 OK\r\n"
-                                "Content-Type: text/html\r\n"
-                                "\r\n"
-                                "<html><body><h1>Uploaded Image</h1>"
-                                "<img src=\"uploaded_image.jpg\" alt=\"Uploaded Image\"/></body></html>";
-
-                            printf("Sending HTML response:\n%s\n", html_response_template);
-                            write(new_socket, html_response_template, strlen(html_response_template));
-                        } else {
-                            perror("File save failed");
-                            send_error_response(new_socket, "500 Internal Server Error", "File save failed");
-                        }
-                    } else {
-                        printf("Failed to find body start\n");
-                        send_error_response(new_socket, "400 Bad Request", "Failed to find body start");
-                    }
-                } else {
-                    printf("Failed to find boundary end\n");
-                    send_error_response(new_socket, "400 Bad Request", "Failed to find boundary end");
+            FILE *file = fopen("upload.jpg", "wb");
+            if (file) {
+                fwrite(content, 1, content_size, file);
+                while (content_size < content_length) {
+                    valread = read(new_socket, buffer, BUFSIZE);
+                    if (valread <= 0) break;
+                    fwrite(buffer, 1, valread, file);
+                    content_size += valread;
                 }
+                fclose(file);
+
+                char *ok_response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
+                write(new_socket, ok_response, strlen(ok_response));
             } else {
-                printf("Failed to find boundary\n");
-                send_error_response(new_socket, "400 Bad Request", "Failed to find boundary");
+                char *internal_error = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\n\r\n500 Internal Server Error";
+                write(new_socket, internal_error, strlen(internal_error));
             }
         } else {
-            printf("Content-Type is not multipart/form-data\n");
-            send_error_response(new_socket, "400 Bad Request", "Content-Type is not multipart/form-data");
+            char *bad_request = "HTTP/1.1 400 Bad Request\r\nContent-Length: 15\r\n\r\n400 Bad Request";
+            write(new_socket, bad_request, strlen(bad_request));
         }
+    } else {
+        send_error_response(new_socket, "405 Method Not Allowed", "405 Method Not Allowed");
     }
 
     close(new_socket);
@@ -291,15 +297,6 @@ void handle_client(int new_socket) {
 }
 
 int main() {
-    struct sigaction sa;
-    sa.sa_handler = &handle_sigchld;
-    sa.sa_flags = SA_RESTART;
-    sigemptyset(&sa.sa_mask);
-    if (sigaction(SIGCHLD, &sa, 0) == -1) {
-        perror("sigaction");
-        exit(1);
-    }
-
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -311,7 +308,7 @@ int main() {
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
+    address.sin_port = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Bind failed");
@@ -331,12 +328,8 @@ int main() {
         printf("Waiting for connections...\n");
 
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
-            if (errno == EINTR) {
-                continue; // accept() がシグナルで中断された場合は再試行
-            } else {
-                perror("Accept failed");
-                continue;
-            }
+            perror("Accept failed");
+            continue;
         }
 
         pid_t pid = fork();
@@ -352,6 +345,7 @@ int main() {
             exit(0);
         } else {
             close(new_socket);
+            waitpid(-1, NULL, WNOHANG); // 子プロセスのゾンビ化を防ぐ
         }
     }
 
